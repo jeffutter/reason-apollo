@@ -8,6 +8,23 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     | Loading
     | Error(apolloError)
     | Data(Config.t);
+  type updateQueryOptions = {
+    .
+    "fetchMoreResult": option(Config.t),
+    "variables": Js.Json.t,
+  };
+  type updateQueryOptionsJS = {
+    .
+    "fetchMoreResult": Js.Nullable.t(Config.t),
+    "variables": Js.Json.t,
+  };
+  type fetchMoreOptions = {
+    .
+    "query": queryString,
+    "variables": Js.Json.t,
+    "updateQuery":
+      Js.Nullable.t((Config.t, updateQueryOptionsJS) => Config.t),
+  };
   type renderPropObj = {
     result: response,
     data: option(Config.t),
@@ -28,7 +45,9 @@ module Get = (Config: ReasonApolloTypes.Config) => {
       ),
     "networkStatus": int,
     "variables": Js.Null_undefined.t(Js.Json.t),
-    "fetchMore": [@bs.meth] (apolloOptions => Js.Promise.t(unit)),
+    "fetchMore": [@bs.meth] (fetchMoreOptions => Js.Promise.t(unit)),
+    "updateQuery":
+      Js.Null_undefined.t((Config.t, updateQueryOptionsJS) => Config.t),
   };
   let graphqlQueryAST = gql(. Config.query);
   let apolloDataToVariant: renderPropObjJS => response =
@@ -74,12 +93,14 @@ module Get = (Config: ReasonApolloTypes.Config) => {
       apolloData##fetchMore({
         "variables": variables,
         "query": graphqlQueryAST,
+        "updateQuery": apolloData##updateQuery,
       }),
     networkStatus: apolloData##networkStatus,
   };
   let make =
       (
         ~variables: option(Js.Json.t)=?,
+        ~updateQuery: option((Config.t, updateQueryOptions) => Config.t)=?,
         ~pollInterval: option(int)=?,
         ~notifyOnNetworkStatusChange: option(bool)=?,
         ~fetchPolicy: option(string)=?,
@@ -97,6 +118,25 @@ module Get = (Config: ReasonApolloTypes.Config) => {
           {
             "query": graphqlQueryAST,
             "variables": variables |> fromOption,
+            "updateQuery":
+              switch (updateQuery) {
+              | Some(updateQuery) =>
+                Some(
+                  (
+                    (previousResult, updateQueryOptionsJS) =>
+                      updateQuery(
+                        previousResult,
+                        {
+                          "variables": updateQueryOptionsJS##variables,
+                          "fetchMoreResult":
+                            updateQueryOptionsJS##fetchMoreResult |> toOption,
+                        },
+                      )
+                  ),
+                )
+                |> fromOption
+              | None => Js.Nullable.null
+              },
             "pollInterval": pollInterval |> fromOption,
             "notifyOnNetworkStatusChange":
               notifyOnNetworkStatusChange
