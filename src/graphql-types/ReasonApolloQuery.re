@@ -31,7 +31,12 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     error: option(apolloError),
     loading: bool,
     refetch: option(Js.Json.t) => Js.Promise.t(response),
-    fetchMore: (~variables: Js.Json.t) => Js.Promise.t(unit),
+    fetchMore:
+      (
+        ~updateQuery: (Config.t, updateQueryOptions) => Config.t=?,
+        ~variables: Js.Json.t
+      ) =>
+      Js.Promise.t(unit),
     networkStatus: int,
   };
   type renderPropObjJS = {
@@ -46,8 +51,6 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     "networkStatus": int,
     "variables": Js.Null_undefined.t(Js.Json.t),
     "fetchMore": [@bs.meth] (fetchMoreOptions => Js.Promise.t(unit)),
-    "updateQuery":
-      Js.Null_undefined.t((Config.t, updateQueryOptionsJS) => Config.t),
   };
   let graphqlQueryAST = gql(. Config.query);
   let apolloDataToVariant: renderPropObjJS => response =
@@ -89,18 +92,36 @@ module Get = (Config: ReasonApolloTypes.Config) => {
       |> Js.Promise.then_(data =>
            data |> apolloDataToVariant |> Js.Promise.resolve
          ),
-    fetchMore: (~variables) =>
+    fetchMore: (~updateQuery=?, ~variables) =>
       apolloData##fetchMore({
         "variables": variables,
         "query": graphqlQueryAST,
-        "updateQuery": apolloData##updateQuery,
+        "updateQuery":
+          switch (updateQuery) {
+          | Some(updateQuery) =>
+            Some(
+              (
+                (previousResult, updateQueryOptionsJS) =>
+                  updateQuery(
+                    previousResult,
+                    {
+                      "variables": updateQueryOptionsJS##variables,
+                      "fetchMoreResult":
+                        updateQueryOptionsJS##fetchMoreResult
+                        |> Js.Nullable.toOption,
+                    },
+                  )
+              ),
+            )
+            |> Js.Nullable.fromOption
+          | None => Js.Nullable.null
+          },
       }),
     networkStatus: apolloData##networkStatus,
   };
   let make =
       (
         ~variables: option(Js.Json.t)=?,
-        ~updateQuery: option((Config.t, updateQueryOptions) => Config.t)=?,
         ~pollInterval: option(int)=?,
         ~notifyOnNetworkStatusChange: option(bool)=?,
         ~fetchPolicy: option(string)=?,
@@ -118,25 +139,6 @@ module Get = (Config: ReasonApolloTypes.Config) => {
           {
             "query": graphqlQueryAST,
             "variables": variables |> fromOption,
-            "updateQuery":
-              switch (updateQuery) {
-              | Some(updateQuery) =>
-                Some(
-                  (
-                    (previousResult, updateQueryOptionsJS) =>
-                      updateQuery(
-                        previousResult,
-                        {
-                          "variables": updateQueryOptionsJS##variables,
-                          "fetchMoreResult":
-                            updateQueryOptionsJS##fetchMoreResult |> toOption,
-                        },
-                      )
-                  ),
-                )
-                |> fromOption
-              | None => Js.Nullable.null
-              },
             "pollInterval": pollInterval |> fromOption,
             "notifyOnNetworkStatusChange":
               notifyOnNetworkStatusChange
