@@ -15,7 +15,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
   };
   type updateQueryOptionsJS = {
     .
-    "fetchMoreResult": Js.Nullable.t(Config.t),
+    "fetchMoreResult": Js.Nullable.t(Js.Json.t),
     "variables": Js.Json.t,
   };
   type fetchMoreOptions = {
@@ -23,7 +23,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     "query": queryString,
     "variables": Js.Json.t,
     "updateQuery":
-      Js.Nullable.t((Config.t, updateQueryOptionsJS) => Config.t),
+      Js.Nullable.t((Js.Json.t, updateQueryOptionsJS) => Config.t),
   };
   type renderPropObj = {
     result: response,
@@ -33,7 +33,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     refetch: option(Js.Json.t) => Js.Promise.t(response),
     fetchMore:
       (
-        ~updateQuery: (Config.t, updateQueryOptions) => Config.t=?,
+        ~updateQuery: (option(Config.t), updateQueryOptions) => Config.t=?,
         ~variables: Js.Json.t
       ) =>
       Js.Promise.t(unit),
@@ -96,19 +96,35 @@ module Get = (Config: ReasonApolloTypes.Config) => {
       apolloData##fetchMore({
         "variables": variables,
         "query": graphqlQueryAST,
+        /* "updateQuery": updateQuery |> Js.Nullable.fromOption, */
         "updateQuery":
           switch (updateQuery) {
           | Some(updateQuery) =>
             Some(
               (
-                (previousResult, updateQueryOptionsJS) =>
+                (
+                  previousResult: Js.Json.t,
+                  updateQueryOptionsJS: updateQueryOptionsJS,
+                ) =>
                   updateQuery(
-                    previousResult,
+                    switch (Config.parse(previousResult)) {
+                    | parsedData => Some(parsedData)
+                    | exception _ => None
+                    },
                     {
                       "variables": updateQueryOptionsJS##variables,
                       "fetchMoreResult":
-                        updateQueryOptionsJS##fetchMoreResult
-                        |> Js.Nullable.toOption,
+                        switch (
+                          updateQueryOptionsJS##fetchMoreResult
+                          |> Js.Nullable.toOption
+                        ) {
+                        | Some(fetchMoreResult) =>
+                          switch (Config.parse(fetchMoreResult)) {
+                          | parsedData => Some(parsedData)
+                          | exception _ => None
+                          }
+                        | None => None
+                        },
                     },
                   )
               ),
