@@ -23,7 +23,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     "query": queryString,
     "variables": Js.Json.t,
     "updateQuery":
-      Js.Nullable.t((Js.Json.t, updateQueryOptionsJS) => Config.t),
+      Js.Nullable.t((Js.Json.t, updateQueryOptionsJS) => Js.t({.})),
   };
   type renderPropObj = {
     result: response,
@@ -33,7 +33,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     refetch: option(Js.Json.t) => Js.Promise.t(response),
     fetchMore:
       (
-        ~updateQuery: (option(Config.t), updateQueryOptions) => Config.t=?,
+        ~updateQuery: (option(Config.t), updateQueryOptions) => Js.t({.})=?,
         ~variables: Js.Json.t
       ) =>
       Js.Promise.t(unit),
@@ -97,6 +97,28 @@ module Get = (Config: ReasonApolloTypes.Config) => {
         "variables": variables,
         "query": graphqlQueryAST,
         /* "updateQuery": updateQuery |> Js.Nullable.fromOption, */
+        /* "updateQuery":
+           (
+             switch (updateQuery) {
+             | Some(updateQuery) =>
+               Some(
+                 (
+                   (previousResult, updateQueryOptions) =>
+                     updateQuery(
+                       previousResult,
+                       {
+                         "variables": updateQueryOptions##variables,
+                         "fetchMoreResult":
+                           updateQueryOptions##fetchMoreResult
+                           |> Js.Nullable.toOption,
+                       },
+                     )
+                 ),
+               )
+             | None => None
+             }
+           )
+           |> Js.Nullable.fromOption, */
         "updateQuery":
           switch (updateQuery) {
           | Some(updateQuery) =>
