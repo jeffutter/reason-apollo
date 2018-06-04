@@ -8,7 +8,7 @@ type queryString;
  * query string to the standard GraphQL AST.
  * https://github.com/apollographql/graphql-tag
  */
-type gql = (. string) => queryString;
+type gql = [@bs] (string => queryString);
 
 /**
  * An abstract type to describe an Apollo Link object.
@@ -39,11 +39,11 @@ type apolloError = {
   .
   "message": string,
   "graphQLErrors": Js.Nullable.t(array(string)),
-  "networkError": Js.Nullable.t(string),
+  "networkError": Js.Nullable.t(string)
 };
 
 type apolloOptions = {
-  .
-  "query": queryString,
-  "variables": Js.Json.t,
+    .
+    "query": queryString,
+    "variables": Js.Json.t,
 };
