@@ -10,7 +10,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     | Data(Config.t);
   type updateQueryOptions = {
     .
-    "fetchMoreResult": option(Config.t),
+    "fetchMoreResult": option(Js.Json.t),
     "variables": Js.Json.t,
   };
   type updateQueryOptionsJS = {
@@ -18,12 +18,13 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     "fetchMoreResult": Js.Nullable.t(Js.Json.t),
     "variables": Js.Json.t,
   };
+  type updateQuery = (Js.Json.t, updateQueryOptions) => Js.Json.t;
+  type updateQueryJS = (Js.Json.t, updateQueryOptionsJS) => Js.Json.t;
   type fetchMoreOptions = {
     .
     "query": queryString,
     "variables": Js.Json.t,
-    "updateQuery":
-      Js.Nullable.t((Js.Json.t, updateQueryOptionsJS) => Js.t({.})),
+    "updateQuery": Js.Nullable.t(updateQueryJS),
   };
   type renderPropObj = {
     result: response,
@@ -32,10 +33,7 @@ module Get = (Config: ReasonApolloTypes.Config) => {
     loading: bool,
     refetch: option(Js.Json.t) => Js.Promise.t(response),
     fetchMore:
-      (
-        ~updateQuery: (option(Config.t), updateQueryOptions) => Js.t({.})=?,
-        ~variables: Js.Json.t
-      ) =>
+      (~updateQuery: updateQuery=?, ~variables: Js.Json.t) =>
       Js.Promise.t(unit),
     networkStatus: int,
   };
@@ -96,64 +94,28 @@ module Get = (Config: ReasonApolloTypes.Config) => {
       apolloData##fetchMore({
         "variables": variables,
         "query": graphqlQueryAST,
-        /* "updateQuery": updateQuery |> Js.Nullable.fromOption, */
-        /* "updateQuery":
-           (
-             switch (updateQuery) {
-             | Some(updateQuery) =>
-               Some(
-                 (
-                   (previousResult, updateQueryOptions) =>
-                     updateQuery(
-                       previousResult,
-                       {
-                         "variables": updateQueryOptions##variables,
-                         "fetchMoreResult":
-                           updateQueryOptions##fetchMoreResult
-                           |> Js.Nullable.toOption,
-                       },
-                     )
-                 ),
-               )
-             | None => None
-             }
-           )
-           |> Js.Nullable.fromOption, */
         "updateQuery":
-          switch (updateQuery) {
-          | Some(updateQuery) =>
-            Some(
-              (
+          (
+            switch (updateQuery) {
+            | Some(updateQuery) =>
+              Some(
                 (
-                  previousResult: Js.Json.t,
-                  updateQueryOptionsJS: updateQueryOptionsJS,
-                ) =>
-                  updateQuery(
-                    switch (Config.parse(previousResult)) {
-                    | parsedData => Some(parsedData)
-                    | exception _ => None
-                    },
-                    {
-                      "variables": updateQueryOptionsJS##variables,
-                      "fetchMoreResult":
-                        switch (
-                          updateQueryOptionsJS##fetchMoreResult
-                          |> Js.Nullable.toOption
-                        ) {
-                        | Some(fetchMoreResult) =>
-                          switch (Config.parse(fetchMoreResult)) {
-                          | parsedData => Some(parsedData)
-                          | exception _ => None
-                          }
-                        | None => None
-                        },
-                    },
-                  )
-              ),
-            )
-            |> Js.Nullable.fromOption
-          | None => Js.Nullable.null
-          },
+                  (previousResult, fetchMoreResult) =>
+                    updateQuery(
+                      previousResult,
+                      {
+                        "variables": fetchMoreResult##variables,
+                        "fetchMoreResult":
+                          fetchMoreResult##fetchMoreResult
+                          |> Js.Nullable.toOption,
+                      },
+                    )
+                ),
+              )
+            | None => None
+            }
+          )
+          |> Js.Nullable.fromOption,
       }),
     networkStatus: apolloData##networkStatus,
   };
